@@ -8,10 +8,9 @@ TableDeleteAll(TABLE_Compras)
 TableDeleteAll(TABLE_Bonif)
 TableDeleteAll(TABLE_Perda)
 
-//TABLE_ven0036.COL_Avaria..Visible = False	
 //------------------------------------------Declaração das Variáveis---------------------------------------//
-Var_where, cliSuspensos,Var_Pedido																	are string	= ""	
-Var_Dataini,Var_DataFim																				are Dates
+Var_where, cliSuspensos,Var_Pedido	are string	= ""	
+Var_Dataini,Var_DataFim			are Dates
 Var_whereorigem,Var_whereFamilia, Var_WhereMarca, Var_whereCidade,Var_CidadeAvaria,Var_gerente		are strings	
 MovEst,MovEstCom, Var_Marcados, Var_CodSim, Var_WhereBairro, Var_WhereVendedor, Var_VendedorComp	is string
 
@@ -87,13 +86,11 @@ IF EDT_Cidade2 <> "" THEN
 		END
 		Var_whereCidade += ")"
 		Var_CidadeAvaria += ")"
-		
 	ELSE 
 		Var_whereCidade		= "and cadcli2.cidade = '"+EDT_Cidade2+ "'"
 		Var_CidadeAvaria	= "and cadcli.cidade = '"+EDT_Cidade2+ "'"
 	END	
 END
-
 
 //------------------------------------------Busca por vários Vendedores ------------------------------------
 IF EDT_Vendedor <> "" THEN
@@ -114,7 +111,6 @@ IF EDT_Vendedor <> "" THEN
 	END	
 END
 
-
 //----------------------------------------- Busca por Bairro ----------------------------------------------
 IF EDT_Cidade2 <> "" AND EDT_Bairro <> "" THEN
 	Var_WhereBairro = " and cadcli2.BAIRRO = '"+EDT_Bairro+ "' "
@@ -128,19 +124,19 @@ Var_sitped, Var_sitmyped are strings
 SWITCH RADIO_NoName1
 	// Em Aberto
 	CASE 1
-		Var_sitped		= " and MyTempPedido.situacao = 1 "
+		Var_sitped	= " and MyTempPedido.situacao = 1 "
 		Var_sitmyped	= " and pedido.situacao = 1"
-		Val_radio		= 1
+		Val_radio	= 1
 	// Faturados
 	CASE 2
-		Var_sitped		= " and MyTempPedido.situacao = 2 "
+		Var_sitped	= " and MyTempPedido.situacao = 2 "
 		Var_sitmyped	= " and pedido.situacao = 2"
-		Val_radio		= 2
+		Val_radio	= 2
 	// Todos
 	CASE 3
-		Var_sitped		= " and (MyTempPedido.situacao = 1 or MyTempPedido.situacao = 2) "
+		Var_sitped      = " and (MyTempPedido.situacao = 1 or MyTempPedido.situacao = 2) "
 		Var_sitmyped	= " and (pedido.situacao = 1 or pedido.situacao = 2) "
-		Val_radio		= 3
+		Val_radio       = 3
 END
 
 IF EDT_Pedido <> "" AND EDT_Pedido <> 0 THEN
@@ -291,8 +287,6 @@ ELSE
 	END
 END
 
-
-
 //--------------------------------------------------------Busca Devoluções------------------------------------------------------//
 
 IF RADIO_NoName1 <> 1 THEN
@@ -322,7 +316,6 @@ IF RADIO_NoName1 <> 1 THEN
 	Var_Marcados+...
 	Var_CodSim+...		
 	" group by Cadcli.Fantasia, cadcli.codigo "
-	
 	
 	IF NOT HExecuteSQLQuery(DTA,Minhaconexao,hQueryWithoutCorrection,Var_dta) THEN
 		Info("Erro na conexão com o Banco de Dados!" + CR + ErrorInfo(errFullDetails))	
@@ -427,8 +420,8 @@ END
 //HReadFirst(EmpPar, Var_Pesquisa323)
 //IF HFound() = True THEN
 //	IF EmpPar.Bolean = "S" THEN
+
 IF TrabAvaria = True THEN
-	
 	//---------------------------------------------------------Calcula Avaria na Pronta Entrega -------------------------------------//
 	
 	Data_AvariaProntaEntrega	is Data Source	//Neste caso utilizei o campo pedido.vago14 (AVARIA) para a verificação. 
