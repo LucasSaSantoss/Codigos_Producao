@@ -1,0 +1,734 @@
+
+PROCEDURE ProcGerarRelatorio()
+
+TableDeleteAll(TABLE_AvariaPrtEntreg)
+TableDeleteAll(TABLE_AvariaCFOP)
+TableDeleteAll(TABLE_ven0036)
+TableDeleteAll(TABLE_Compras) 
+TableDeleteAll(TABLE_Bonif)
+TableDeleteAll(TABLE_Perda)
+
+//TABLE_ven0036.COL_Avaria..Visible = False	
+//------------------------------------------Declaração das Variáveis---------------------------------------//
+Var_where, cliSuspensos,Var_Pedido																	are string	= ""	
+Var_Dataini,Var_DataFim																				are Dates
+Var_whereorigem,Var_whereFamilia, Var_WhereMarca, Var_whereCidade,Var_CidadeAvaria,Var_gerente		are strings	
+MovEst,MovEstCom, Var_Marcados, Var_CodSim, Var_WhereBairro, Var_WhereVendedor, Var_VendedorComp	is string
+
+//------------------------------------------Determinação dos Parâmetros-------------------------------------//
+
+
+//------------------------------------------Busca por múltiplas origens------------------------------------//
+IF EDT_origem2 <> "" THEN
+	Var_int			is int	= StringCount(EDT_origem2,",",IgnoreCase)
+	IF Var_int <> 0 THEN
+		Var_whereorigem = "and (produto.origem = (select codigo from origem where descricao = '"+ExtractString(EDT_origem2,1,",",FromBeginning)+ "')"
+		IF Var_int >= 1 THEN
+			Var_int++
+			FOR i = 2 TO Var_int
+				Var_whereorigem += " or produto.origem =  (select codigo from origem where descricao = '"+ExtractString(EDT_origem2,i,",",FromBeginning) + "')"			
+			END
+		END
+		Var_whereorigem += ")"
+	ELSE 
+		Var_whereorigem = "and produto.origem =  (select codigo from origem where descricao = '"+EDT_origem2+ "')"
+	END	
+END
+
+//------------------------------------------Busca por múltiplas Marcas------------------------------------//
+
+IF EDT_Marca2 <> "" THEN
+	Var_real			is int	= StringCount(EDT_Marca2,",",IgnoreCase)
+	IF Var_real <> 0 THEN
+		Var_WhereMarca = "and (produto.Marca = (select codigo from Marca where descricao ='"+ExtractString(EDT_Marca2,1,",",FromBeginning)	+ "')"
+		IF Var_real >= 1 THEN
+			Var_real++
+			FOR i = 2 TO Var_real
+				Var_WhereMarca += " or produto.Marca = (select codigo from Marca where descricao ='"+ExtractString(EDT_Marca2,i,",",FromBeginning) + "')"			
+			END
+		END
+		Var_WhereMarca += ")"
+	ELSE 
+		Var_WhereMarca = "and produto.Marca =(select codigo from Marca where descricao = '"+EDT_Marca2+"')"
+	END	
+END
+
+//------------------------------------------Busca por múltiplas Famílias------------------------------------//
+
+IF EDT_Família1 <> "" THEN
+	Var_num			is int	= StringCount(EDT_Família1,",",IgnoreCase)
+	IF Var_num <> 0 THEN
+		Var_whereFamilia = "and (produto.Familia = (select codigo from Familia where descricao ='"+ExtractString(EDT_Família1,1,",",FromBeginning) + "')"		
+		IF Var_num >= 1 THEN
+			Var_num++
+			FOR i = 2 TO Var_num
+				Var_whereFamilia += " or produto.Familia = (select codigo from Familia where descricao ='"+ExtractString(EDT_Família1,i,",",FromBeginning) + "')"			
+			END
+		END
+		Var_whereFamilia += ")"
+	ELSE 
+		Var_whereFamilia = "and produto.Familia = (select codigo from Familia where descricao ='"+EDT_Família1 + "')"
+	END	
+END
+
+//------------------------------------------Busca por múltiplas Cidades------------------------------------//
+
+IF EDT_Cidade2 <> "" THEN
+	Var_numero			is int	= StringCount(EDT_Cidade2,",",IgnoreCase)
+	IF Var_numero <> 0 THEN
+		Var_whereCidade		= "and (cadcli2.cidade = '"+ExtractString(EDT_Cidade2,1,",",FromBeginning)+ "'"	
+		Var_CidadeAvaria	= "and (cadcli.cidade = '"+ExtractString(EDT_Cidade2,1,",",FromBeginning)+ "'"	
+		IF Var_numero >= 1 THEN
+			Var_numero++
+			FOR i = 2 TO Var_numero
+				Var_whereCidade += " or cadcli2.cidade = '"+ExtractString(EDT_Cidade2,i,",",FromBeginning)+ "'"		
+				Var_CidadeAvaria += " or cadcli.cidade = '"+ExtractString(EDT_Cidade2,i,",",FromBeginning)+ "'"		
+			END
+		END
+		Var_whereCidade += ")"
+		Var_CidadeAvaria += ")"
+		
+	ELSE 
+		Var_whereCidade		= "and cadcli2.cidade = '"+EDT_Cidade2+ "'"
+		Var_CidadeAvaria	= "and cadcli.cidade = '"+EDT_Cidade2+ "'"
+	END	
+END
+
+
+//------------------------------------------Busca por vários Vendedores ------------------------------------
+IF EDT_Vendedor <> "" THEN
+	Var_QuantVend is int = StringCount(EDT_Vendedor,",",IgnoreCase)
+	IF Var_QuantVend = 0 THEN
+		Var_WhereVendedor = " and MyTempPedido.nvago1 = "+ExtractString(EDT_Vendedor,1,",",FromBeginning)+ " "
+		Var_VendedorComp = " and compra.nvago6 = "+ExtractString(EDT_Vendedor,1,",",FromBeginning)+ " "
+	ELSE
+		Var_WhereVendedor = " and (MyTempPedido.nvago1 = "+ExtractString(EDT_Vendedor,1,",",FromBeginning)+ " "
+		Var_VendedorComp = " and (compra.nvago6 = "+ExtractString(EDT_Vendedor,1,",",FromBeginning)+ " "
+		Var_QuantVend += 1
+		FOR i = 2 TO Var_QuantVend
+			Var_WhereVendedor += " or MyTempPedido.nvago1 = "+ExtractString(EDT_Vendedor,i,",",FromBeginning)+ " "
+			Var_VendedorComp += " or compra.nvago6  = "+ExtractString(EDT_Vendedor,i,",",FromBeginning)+ " "
+		END
+		Var_WhereVendedor += ") "
+		Var_VendedorComp += ") "
+	END	
+END
+
+
+//----------------------------------------- Busca por Bairro ----------------------------------------------
+IF EDT_Cidade2 <> "" AND EDT_Bairro <> "" THEN
+	Var_WhereBairro = " and cadcli2.BAIRRO = '"+EDT_Bairro+ "' "
+	Var_DescrBairro = EDT_Bairro
+END
+
+//------------------------------------------Filtra pedidos em aberto, faturado e todos------------------------------------//
+
+Var_sitped, Var_sitmyped are strings	
+
+SWITCH RADIO_NoName1
+	// Em Aberto
+	CASE 1
+		Var_sitped		= " and MyTempPedido.situacao = 1 "
+		Var_sitmyped	= " and pedido.situacao = 1"
+		Val_radio		= 1
+	// Faturados
+	CASE 2
+		Var_sitped		= " and MyTempPedido.situacao = 2 "
+		Var_sitmyped	= " and pedido.situacao = 2"
+		Val_radio		= 2
+	// Todos
+	CASE 3
+		Var_sitped		= " and (MyTempPedido.situacao = 1 or MyTempPedido.situacao = 2) "
+		Var_sitmyped	= " and (pedido.situacao = 1 or pedido.situacao = 2) "
+		Val_radio		= 3
+END
+
+IF EDT_Pedido <> "" AND EDT_Pedido <> 0 THEN
+	Var_Pedido = "and MyTempPedido.pedido = '"+EDT_Pedido+"' " 			
+END
+
+Var_Dataini	= EDT_DtIni
+Var_DataFim	= EDT_DtFim
+
+IF Var_Dataini = "" THEN
+	Var_Dataini = Today()
+END
+
+IF Var_DataFim = "" THEN
+	Var_DataFim = Today()
+END
+
+IF EDT_Supervisor <> "" AND EDT_Supervisor <> 0 THEN
+	Var_where = "and cadcli.nvago10 like '"+Var_codVen+ "%'" 
+END
+
+IF EDT_Gerente <> "" AND EDT_Gerente <> 0 THEN
+	Var_gerente = "and cadcli.nvago13 like '"+Var_codGer+ "%'" 
+END 
+
+IF CBOX_CliSupensos = True THEN
+	cliSuspensos = " (select dbo.FC_101_RetornaQtdClientesVendedor (MyTempPedido.nvago1)) as Quantidade, "
+ELSE
+	cliSuspensos = " (select dbo.FC_123_RetornaQtdClientesVendedorSemSuspensos (MyTempPedido.nvago1)) as Quantidade, "
+END
+
+SWITCH RADIO_Estoque
+	// Movimenta Estoque
+	CASE 1
+		MovEst		=  " and MyTempPedido.estoque = 1 "
+		MovEstCom	= " and compra.estoque = 1"
+	// Não Movimenta 
+	CASE 2
+		MovEst		= " and MyTempPedido.estoque ='' "
+		MovEstCom	= " and compra.estoque ='' "
+	// Todos
+	CASE 3
+		MovEst		= " "
+		MovEstCom	= " "
+END
+
+IF CBOX_ProdMarc = True THEN
+	Var_Marcados = "AND Produto.Marcado = '1' "
+ELSE	
+	Var_Marcados = ""
+END
+
+IF 	EDT_CodSim <> "" THEN
+	Var_CodSim = "AND Produto.CodSim = " + EDT_CodSim
+ELSE
+	Var_CodSim = ""
+END
+
+//----------------------------------------------------------DROP das tabelas Temporárias----------------------------------//
+
+Var_StringDeleta = "IF Exists(Select name from sysobjects where name='MyTempPedido') "+...	
+"Begin "+...
+"	Drop table MyTempPedido "+...
+"END "+...
+"IF Exists(Select name from sysobjects where name='MyTempitens') "+...	
+"Begin "+...
+"	Drop table MyTempitens"+...
+" END"
+
+ApagaTabelasTemp()
+
+//------------------------------------------------------------Criação das Tabelas Temporárias-----------------------------//
+
+Resultadotb1	is Data Source	
+
+Var_Stringtb1	is string	= "SELECT * INTO MyTempPedido From Pedido "+...
+"where pedido.dt_data between '"+Var_Dataini+" 00:00:00:001' and '"+Var_DataFim+" 23:59:59:000'  "+...
+"and pedido.vago7 = '' "+...	
+Var_sitmyped +...	
+"and Pedido.CFOP in (select CFOP.codigo from CFOP where CFOP.venda = '1' or cfop.vago1 = '1')" 
+
+IF NOT HExecuteSQLQuery(Resultadotb1,Minhaconexao,hQueryWithoutCorrection,Var_Stringtb1) THEN
+	ApagaTabelasTemp()
+	Info("Erro ao obter a Lista de Pedidos!")
+	Error(ErrorInfo(errFullDetails))	
+	RETURN
+END
+
+Resultadotb2	is Data Source 
+
+Var_stringtb2	is string	= "SELECT itens.numero,itens.codred,itens.cfop,itens.quantidade, itens.corte, itens.Devolvido,itens.Valorneguni,itens.perda,itens.Valtotperda,itens.pesoliq INTO MyTempitens From itens "+...
+"inner join MyTempPedido on itens.numero = MyTempPedido.numero "+...
+"where MyTempPedido.dt_data between '"+Var_Dataini+" 00:00:00:001' and '"+Var_DataFim+" 23:59:59:000'  "+...
+"and MyTempPedido.vago7 = '' "+...
+Var_sitped +...
+"and MyTempPedido.CFOP in (select CFOP.codigo from CFOP where CFOP.venda = '1' or cfop.vago1 = '1')"
+
+IF NOT HExecuteSQLQuery(Resultadotb2,Minhaconexao,hQueryWithoutCorrection,Var_stringtb2) THEN
+	ApagaTabelasTemp()
+	Info("Erro ao obter a Lista de Pedidos!")	
+	Error(ErrorInfo(errFullDetails))
+	RETURN
+END
+
+//-----------------------------------------------------------Carrega dados nas Tables------------------------------------------------//
+//--------------------------------------------------------------Busca Faturamento-------------------------------------------------//
+
+Data		is Data Source	
+
+Var_String	is string	= "select sum(((MyTempitens.quantidade - MyTempitens.corte - MyTempitens.Devolvido)*MyTempitens.Valorneguni) ) as ValorBruto,sum(((MyTempitens.quantidade - MyTempitens.corte - MyTempitens.Devolvido)* coalesce(MyTempitens.Valorneguni,0)) - coalesce(MyTempitens.valtotperda,0)) as valtotfat,sum(MyTempitens.valtotperda) as perda, "+...
+"cadcli.nome as fantasia, cadcli.codigo as codigo, Count(distinct(MyTempPedido.CGCCPF)) as Pos, "+...
+cliSuspensos+...
+"Count(distinct(MyTempPedido.numero)) as Pedidos, "+...
+"coalesce(sum((MyTempitens.Quantidade-MyTempitens.corte-mytempitens.devolvido )/nullif(unipcaixa,0)),0) as caixas, "+...
+"sum((MyTempitens.Quantidade-MyTempitens.corte-mytempitens.devolvido )*(MyTempitens.pesoliq)) as Peso, "+...
+"(Select [dbo].[FC_105_RetornaQtdNovosClientes] (CadCli.Codigo,'"+Var_Dataini+"','"+Var_DataFim+"')) As Novos "+...
+"from MyTempitens "+... 
+"inner join MyTempPedido on MyTempitens.numero = MyTempPedido.numero "+...
+"inner join cadcli on MyTempPedido.nvago1 = cadcli.codigo "+...
+"inner join cadcli as cadcli2 on MyTempPedido.cgccpf = cadcli2.cgc2 "+...
+"inner join produto on MyTempitens.codred = produto.codsim "+...
+"where MyTempPedido.dt_data between '"+Var_Dataini+" 00:00:00:001' and '"+Var_DataFim+" 23:59:59:000' "+...
+"and MyTempPedido.vago7 = '' "+...
+Var_whereorigem +...	
+Var_whereFamilia +...
+Var_WhereMarca +...
+Var_where +...
+Var_whereCidade +...
+Var_WhereVendedor +...
+Var_WhereBairro +...
+Var_Pedido +...
+Var_sitped +...
+Var_gerente +...
+MovEst+...
+Var_Marcados+...
+Var_CodSim+...
+"and MyTempPedido.CFOP in (select CFOP.codigo from CFOP where CFOP.venda = '1' or cfop.vago1 = '1') "+...	
+"group by cadcli.Nome,cadcli.codigo, MyTempPedido.nvago1 "+...
+" Order by Cadcli.codigo "
+
+IF NOT HExecuteSQLQuery(Data,Minhaconexao,hQueryWithoutCorrection,Var_String) THEN
+	Info("Erro na conexão com o Banco de Dados!")
+ELSE
+	HReadFirst(Data)
+	WHILE HFound(Data)=True
+		TableAddLine(TABLE_ven0036,Data.codigo,Data.Fantasia,Data.pedidos,Data.Valtotfat,0,0,0,Round(Data.Caixas,1),Round(Data.Peso,5),0,0,Data.perda,0,0,Data.Pos,Data.Quantidade,"","",Data.Novos,"","","",Data.ValorBruto)			
+		HReadNext(Data)	
+	END
+END
+
+
+
+//--------------------------------------------------------Busca Devoluções------------------------------------------------------//
+
+IF RADIO_NoName1 <> 1 THEN
+	DTA		is Data Source
+	Var_dta	is string	= "select sum(itenscom.ValorNegtot) as ValtotCom, Cadcli.fantasia as Fantasia,cadcli.codigo as Codigo, "+...
+	"sum((itenscom.Quantidade-itenscom.corte)/unipcaixa) as Caixas, sum((itenscom.quantidade-itenscom.corte)*itenscom.pesoliq) as Peso "+...
+	"from itenscom "+...
+	"left join cfop on itenscom.cfop = cfop.codigo "+...
+	"left join compra on itenscom.numero = compra.numero "+...
+	"inner join cadcli on compra.nvago6	= cadcli.codigo "+...
+	"inner join cadcli as cadcli2 on compra.cgccpf = cadcli2.cgc2 "+...
+	"inner join produto on itenscom.codred	= produto.codsim "+...
+	"where cfop.vago3 = '1' "+...
+	"and compra.dt_dataent between '"+Var_Dataini+" 00:00:00:001' and '"+Var_DataFim+" 23:59:59:000' "+...
+	"and compra.svago2='' "+...
+	Var_where +...
+	"and cfop.vago25 <> '1' "+...
+	"and compra.situacao = 2 " +...
+	Var_whereFamilia +...
+	Var_WhereMarca +...
+	Var_whereorigem +...
+	Var_whereCidade +...
+	Var_VendedorComp +...
+	Var_WhereBairro +...
+	Var_gerente +...	
+	MovEstCom+...
+	Var_Marcados+...
+	Var_CodSim+...		
+	" group by Cadcli.Fantasia, cadcli.codigo "
+	
+	
+	IF NOT HExecuteSQLQuery(DTA,Minhaconexao,hQueryWithoutCorrection,Var_dta) THEN
+		Info("Erro na conexão com o Banco de Dados!" + CR + ErrorInfo(errFullDetails))	
+	ELSE
+		HReadFirst(DTA)
+		WHILE HFound(DTA)=True
+			TableAddLine(TABLE_Compras,DTA.Codigo,DTA.Fantasia,DTA.valtotcom,Round(DTA.Caixas,1),Round(DTA.Peso,5))	
+			HReadNext(DTA)
+		END
+	END
+END
+
+IF EDT_Pedido <> "" AND EDT_Pedido <> 0 THEN
+	TableDeleteAll(TABLE_Compras)
+END
+
+//---------------------------------------------------Calcula Bonificação-----------------------------------------------------//
+
+Data_sauce	is Data Source
+
+Var_sauce	is string	= "select Sum(MyTempitens.Valorneguni *  (MyTempitens.quantidade - MyTempitens.devolvido - MyTempitens.perda - MyTempitens.corte)) as valtotBonif, cadcli.FANTASIA as fantasia, "+...
+"cadcli.CODIGO as codigo, sum((MyTempitens.Quantidade-MyTempitens.corte-mytempitens.devolvido - MyTempItens.perda)/unipcaixa) as Caixas, "+...
+"sum((MyTempitens.Quantidade-MyTempitens.corte-mytempitens.devolvido - MyTempItens.perda)*MyTempitens.pesoliq) as Peso  "+...
+"from MyTempitens "+...
+"inner join MyTempPedido on MyTempitens.numero = MyTempPedido.numero "+...
+"inner join cadcli on MyTempPedido.nvago1 = cadcli.codigo "+...
+"inner join cadcli as cadcli2 on MyTempPedido.cgccpf = cadcli2.cgc2 "+...
+"inner join produto on MyTempitens.codred = produto.codsim "+...
+"inner join cfop on MyTempitens.cfop		= cfop.codigo "+...
+"where MyTempPedido.dt_data between '"+Var_Dataini+" 00:00:00:001' and '"+Var_DataFim+" 23:59:59:000' "+...
+"and MyTempPedido.vago7 = '' "+...
+"and cfop.vago1 = '1' "+...
+Var_where +...
+Var_sitped +...
+Var_whereFamilia +...
+Var_WhereMarca +...
+Var_whereorigem +...
+Var_whereCidade +...
+Var_WhereVendedor +...
+Var_WhereBairro +...
+Var_gerente +...	
+MovEst+...
+Var_Marcados+...
+Var_CodSim+...
+" group by cadcli.Fantasia,cadcli.codigo, MyTempPedido.nvago1 "
+
+IF NOT HExecuteSQLQuery(Data_sauce,Minhaconexao,hQueryWithoutCorrection,Var_sauce) THEN
+	Info("Erro na conexão com o Banco de Dados!" + CR + ErrorInfo(errFullDetails))	
+ELSE
+	HReadFirst(Data_sauce)
+	WHILE HFound(Data_sauce)=True
+		TableAddLine(TABLE_Bonif,Data_sauce.Codigo,Data_sauce.Fantasia,Data_sauce.valtotBonif,Round(Data_sauce.Caixas,1),Round(Data_sauce.Peso,5))	
+		HReadNext(Data_sauce)
+	END
+END
+
+IF EDT_Pedido <> "" AND EDT_Pedido <> 0 THEN
+	TableDeleteAll(TABLE_Bonif)
+END
+
+//---------------------------------------------------------Calcula Perda-----------------------------------------------//
+
+Data_perda	is Data Source
+
+Var_perda	is string	=   " select Sum(Valorneguni *  (quantidade - devolvido - perda - corte)) as Valtotperda, "+...
+"Count(distinct(MyTempPedido.numero)) as Pedidos ,  "+...
+"cadcli.FANTASIA as fantasia, cadcli.codigo as codigo "+...
+"from itens "+...
+"inner join MyTempPedido on itens.numero						= MyTempPedido.numero "+...
+"inner join cadcli on MyTempPedido.nvago1						= cadcli.codigo "+...
+"inner join cadcli as cadcli2 on MyTempPedido.cgccpf			= cadcli2.cgc2 "+...
+"inner join produto on itens.codred						= produto.codsim "+...
+"where MyTempPedido.dt_data between '"+Var_Dataini+" 00:00:00:001' and '"+Var_DataFim+" 23:59:59:000' "+...
+"and MyTempPedido.cfop in (select CFOP.codigo from CFOP where CFOP.vago2 = '1' and cfop.vago25 <> '1' and cfop.vago1 <> 1) "+...
+Var_where +...
+Var_sitped +...
+Var_whereFamilia +...
+Var_WhereMarca +...
+Var_whereorigem +...
+Var_whereCidade +...
+Var_WhereVendedor +...
+Var_WhereBairro +...	
+Var_gerente +...
+MovEst+...
+Var_Marcados+...
+Var_CodSim+...
+"group by cadcli.FANTASIA,cadcli.CODIGO "
+
+IF NOT HExecuteSQLQuery(Data_perda,Minhaconexao,hQueryWithoutCorrection,Var_perda) THEN
+	Info("Erro na conexão com o Banco de Dados!" + CR + ErrorInfo(errFullDetails))	
+ELSE
+	HReadFirst(Data_perda)
+	WHILE HFound(Data_perda)=True
+		TableAddLine(TABLE_Perda,Data_perda.valtotperda,Data_perda.fantasia,Data_perda.codigo,Data_perda.Pedidos)
+		HReadNext(Data_perda)
+	END
+END
+
+//================== Trabalha com Avaria ================
+
+//Var_Pesquisa323 = HFilter(EmpPar, "CODIGO=323")
+//HReadFirst(EmpPar, Var_Pesquisa323)
+//IF HFound() = True THEN
+//	IF EmpPar.Bolean = "S" THEN
+IF TrabAvaria = True THEN
+	
+	//---------------------------------------------------------Calcula Avaria na Pronta Entrega -------------------------------------//
+	
+	Data_AvariaProntaEntrega	is Data Source	//Neste caso utilizei o campo pedido.vago14 (AVARIA) para a verificação. 
+	
+	AvariaPrtEntrg				is string	= "select sum(((itens.quantidade - itens.corte - itens.Devolvido)*itens.Valorneguni) - itens.valtotperda) as valtotfat, "+...
+	"cadcli.fantasia,Count(distinct(Pedido.pedido)) as Pedidos, cadcli.codigo as codigo "+...
+	"from Pedido "+...
+	"inner join itens on Pedido.numero	= itens.numero "+...
+	"inner join cadcli on Pedido.nvago1	= cadcli.codigo "+...
+	"inner join produto on itens.codred	= produto.codsim "+...
+	"where Pedido.dt_data between '"+Var_Dataini+" 00:00:00:001' and '"+Var_DataFim+" 23:59:59:000' "+...
+	Var_where +...
+	Var_sitmyped +...
+	Var_whereFamilia +...
+	Var_WhereMarca +...
+	Var_whereorigem +...
+	Var_CidadeAvaria +...	
+	Var_gerente +...
+	Var_Marcados+...
+	Var_CodSim+...
+	"and Pedido.vago14 = 1 "+...	
+	"group by Pedido.nvago1,cadcli.fantasia,cadcli.codigo"
+	
+	IF NOT HExecuteSQLQuery(Data_AvariaProntaEntrega,Minhaconexao,hQueryWithoutCorrection,AvariaPrtEntrg) THEN
+		Info("Erro na conexão com o Banco de Dados!" + CR + ErrorInfo(errFullDetails))	
+	ELSE
+		HReadFirst(Data_AvariaProntaEntrega)
+		WHILE HFound(Data_AvariaProntaEntrega)=True
+			TableAddLine(TABLE_AvariaPrtEntreg,Data_AvariaProntaEntrega.codigo,Data_AvariaProntaEntrega.fantasia,Data_AvariaProntaEntrega.valtotfat,Data_AvariaProntaEntrega.pedidos)		
+			HReadNext(Data_AvariaProntaEntrega)
+		END
+	END
+	
+	//---------------------------------------------------------Calcula Avaria pelo CFOP de perda-------------------------------------//
+	
+	Data_AvariaCfopPerd		is Data Source	//Neste caso utilizei o CFOP  codigo 5927 para a verificação.
+	
+	AvariaCfopPerd			is string	= " select sum(((itens.quantidade - itens.corte - itens.Devolvido)*itens.Valorneguni) - itens.valtotperda) as valtotfat, "+..."
+	"cadcli.fantasia,Count(distinct(Pedido.pedido)) as Pedidos, cadcli.codigo "+...
+	"from Pedido "+...
+	"inner join itens on Pedido.numero	= itens.numero "+...
+	"inner join cadcli on Pedido.nvago1	= cadcli.codigo "+...
+	"inner join produto on itens.codred	= produto.codsim "+...
+	"where Pedido.dt_data between '"+Var_Dataini+" 00:00:00:001' and '"+Var_DataFim+" 23:59:59:000' "+...
+	Var_where +...
+	Var_sitmyped +...
+	Var_whereFamilia +...
+	Var_WhereMarca +...
+	Var_whereorigem +...
+	Var_CidadeAvaria +...	
+	Var_gerente +...
+	Var_Marcados+...
+	Var_CodSim+...
+	"and Pedido.vago7 = '' "+...
+	" and pedido.CFOP = 5927"+...
+	"group by Pedido.nvago1,cadcli.fantasia, cadcli.codigo "
+	
+	IF NOT HExecuteSQLQuery(Data_AvariaCfopPerd,Minhaconexao,hQueryWithoutCorrection,AvariaCfopPerd) THEN
+		Info("Erro na conexão com o Banco de Dados!" + CR + ErrorInfo(errFullDetails))	
+	ELSE
+		HReadFirst(Data_AvariaCfopPerd)
+		WHILE HFound(Data_AvariaCfopPerd)=True
+			TableAddLine(TABLE_AvariaCFOP,Data_AvariaCfopPerd.codigo,Data_AvariaCfopPerd.fantasia,Data_AvariaCfopPerd.valtotfat,Data_AvariaCfopPerd.pedidos)		
+			HReadNext(Data_AvariaCfopPerd)
+		END
+	END
+END
+HDeactivateFilter(EmpPar)
+
+//--------------------------------------------Calcula resultados nas tables--------------------------------------------------//
+
+IF TrabAvaria = True THEN
+	
+	FOR EACH ROW OF TABLE_AvariaPrtEntreg //Processo criado para que a coluna Avaria seja preenchida quando o checkbox 'Avaria' estiver marcado no pedido (pedido.vago14)
+		Var_seek is int = TableSeek(TABLE_ven0036.COL_codigo,TABLE_AvariaPrtEntreg[TABLE_AvariaPrtEntreg].COL_codigo,searchExactMatch)
+		IF Var_seek <> -1 THEN
+			avariaProntaEnt	is numeric	= TABLE_AvariaPrtEntreg[TABLE_AvariaPrtEntreg].COL_Valtot
+			var_Vendas		is numeric	= TABLE_ven0036[Var_seek].COL_Vendas
+			TABLE_ven0036[Var_seek].COL_Avaria	= avariaProntaEnt
+			TABLE_ven0036[Var_seek].COL_Vendas	= var_Vendas - avariaProntaEnt
+		END
+	END
+	
+	FOR EACH ROW OF TABLE_AvariaCFOP 	//Processo criado para abater do valor total a avaria apresentada pelo CFOP 5927 e para preencher a tabela quando o pedido de avaria possuir o CFOP 5927.
+		Var_seek is int = TableSeek(TABLE_ven0036.COL_codigo,TABLE_AvariaCFOP[TABLE_AvariaCFOP].COL_codigo,searchExactMatch)
+		IF Var_seek <> -1 THEN
+			avariaCFOP			is numeric	= TABLE_AvariaCFOP[TABLE_AvariaCFOP].COL_Valtot
+			//QtdPedidosAvaria is numeric = TABLE_AvariaPrtEntreg[TABLE_AvariaPrtEntreg].COL_QtdPed // Somente pedidos de venda serão considerados. Avaria, por sua vez, não.
+			xPedidosVendasTot	is numeric	= TABLE_ven0036[Var_seek].COL_Vendas
+			//TABLE_ven0036[Var_seek].COL_Avaria += avariaCFOP
+			TABLE_ven0036[Var_seek].COL_Vendas = xPedidosVendasTot - avariaCFOP
+		END
+	END
+END
+
+FOR EACH ROW OF TABLE_Compras
+	Var_seek is int = TableSeek(TABLE_ven0036.COL_codigo,TABLE_Compras[TABLE_Compras].COL_codigo,searchExactMatch)
+	IF Var_seek <> -1 THEN
+		Var_ven		is numeric	= TABLE_ven0036[Var_seek].COL_Vendas
+		Var_com		is numeric	= TABLE_Compras[TABLE_Compras].COL_ValtotCom
+		Var_cai		is numeric	= TABLE_ven0036[Var_seek].COL_Caixas
+		Var_caicom	is numeric	= TABLE_Compras[TABLE_Compras].COL_Caixas
+		TABLE_ven0036[Var_seek].COL_Vendas		= Var_ven - Var_com
+		TABLE_ven0036[Var_seek].COL_Devolucao	= Var_com	
+		TABLE_ven0036[Var_seek].COL_Caixas		= Var_cai - Var_caicom
+	ELSE
+		Var_Valtot	is numeric	= TABLE_Compras[TABLE_Compras].COL_ValtotCom
+		Var_caixa	is numeric	= TABLE_Compras[TABLE_Compras].COL_Caixas
+		Var_peso	is numeric	= TABLE_Compras[TABLE_Compras].COL_Peso
+		TableAddLine(TABLE_ven0036,	TABLE_Compras[TABLE_Compras].COL_codigo,TABLE_Compras[TABLE_Compras].COL_Fantasia,0,(-1)*Var_Valtot,0,0,0,Var_caixa,Var_peso,Var_Valtot,0,0,0,0,0)	
+	END
+END
+
+FOR EACH ROW OF TABLE_Bonif
+	Var_seek is int = TableSeek(TABLE_ven0036.COL_codigo,TABLE_Bonif[TABLE_Bonif].COL_Codigo,searchExactMatch)
+	IF Var_seek <> -1 THEN
+		Var_ven			is numeric	= TABLE_ven0036[Var_seek].COL_Vendas
+		Var_Bon			is numeric	= TABLE_Bonif[TABLE_Bonif].COL_Bonif
+		xVar_quant		is numeric	= TABLE_ven0036[Var_seek].COL_Caixas	
+		xVar_quantbonif	is numeric	= TABLE_Bonif[TABLE_Bonif].COL_Caixas
+		xVar_peso		is numeric	= TABLE_ven0036[Var_seek].COL_Peso	
+		xVar_pesobonif	is numeric	= TABLE_Bonif[TABLE_Bonif].COL_Peso
+		TABLE_ven0036[Var_seek].COL_Bonif	= TABLE_Bonif[TABLE_Bonif].COL_Bonif	
+		TABLE_ven0036[Var_seek].COL_Vendas	= Var_ven - Var_Bon
+		TABLE_ven0036[Var_seek].COL_Caixas	= xVar_quant - xVar_quantbonif
+		TABLE_ven0036[Var_seek].COL_Peso	= xVar_peso  - xVar_pesobonif
+	ELSE
+		Var_Valtot is numeric = TABLE_Bonif[TABLE_Bonif].COL_Bonif
+		TableAddLine(TABLE_ven0036,	TABLE_Bonif[TABLE_Bonif].COL_Codigo,TABLE_Bonif[TABLE_Bonif].COL_Fantasia,Var_Valtot)	
+	END
+END
+
+FOR EACH ROW OF TABLE_Perda
+	Var_seek is int = TableSeek(TABLE_ven0036.COL_codigo,TABLE_Perda[TABLE_Perda].COL_codigo,searchExactMatch)
+	IF Var_seek <> -1 THEN
+		xVar_vend			is numeric	= TABLE_ven0036[Var_seek].COL_Vendas
+		xVar_perdatabperd	is numeric	=  TABLE_Perda[TABLE_Perda].COL_Valtotperda
+		xVar_perdatab		is numeric	=  TABLE_ven0036[Var_seek].COL_Perda	
+		
+		TABLE_ven0036[Var_seek].COL_Perda	= TABLE_ven0036[Var_seek].COL_Perda + TABLE_Perda[TABLE_Perda].COL_Valtotperda
+		TABLE_ven0036[Var_seek].COL_Vendas	= xVar_vend - xVar_perdatabperd
+	ELSE
+		val_perda is numeric = TABLE_Perda[TABLE_Perda].COL_Valtotperda
+		//TableAddline(TABLE_ven0036,TABLE_Perda[TABLE_Perda].COL_codigo,TABLE_Perda[TABLE_Perda].COL_Fantasia,TABLE_Perda[TABLE_Perda].COL_Pedidos,(-1) * val_perda,"","","","","","","",val_perda)
+		TableAddLine(TABLE_ven0036,TABLE_Perda[TABLE_Perda].COL_codigo,TABLE_Perda[TABLE_Perda].COL_Fantasia,TABLE_Perda[TABLE_Perda].COL_Pedidos,"","","","","","","","",val_perda)
+	END
+END
+
+FOR EACH ROW OF TABLE_ven0036
+	
+	ven_vendas		is numeric	= TABLE_ven0036[TABLE_ven0036].COL_Vendas
+	Ven_pedidos		is numeric	= TABLE_ven0036[TABLE_ven0036].COL_Pedidos
+	Ven_avarias		is numeric	= TABLE_ven0036[TABLE_ven0036].COL_Avaria
+	
+	IF Ven_pedidos <> 0 THEN	
+		TABLE_ven0036[TABLE_ven0036].COL_Ticketmed =  Round(ven_vendas / Ven_pedidos,2)	
+	ELSE
+		TABLE_ven0036[TABLE_ven0036].COL_Ticketmed =  ""
+	END
+	
+	IF TABLE_ven0036[TABLE_ven0036].COL_Vendas <> 0 THEN	
+		TABLE_ven0036[TABLE_ven0036].COL_Vendas = ven_vendas - Ven_avarias
+	END
+	
+	IF TABLE_ven0036[TABLE_ven0036].COL_Perda <> 0 THEN	
+		Var_perd	is numeric	= TABLE_ven0036[TABLE_ven0036].COL_Perda
+		Var_vend	is numeric	= TABLE_ven0036[TABLE_ven0036].COL_ValorBruto
+		
+		IF Var_vend <> 0 THEN
+			TABLE_ven0036[TABLE_ven0036].COL_Perdaporcen = 	Round(((Var_perd*100)/Var_vend),2)	
+			//TABLE_ven0036[TABLE_ven0036].COL_Vendas = Var_vend - Var_perd
+		ELSE
+			TABLE_ven0036[TABLE_ven0036].COL_Perdaporcen = ""
+		END	
+	END
+	
+	IF TABLE_ven0036[TABLE_ven0036].COL_PositivQuant > 0 THEN
+		Var_pos			is int	= TABLE_ven0036[TABLE_ven0036].COL_Positiv
+		Var_posquant	is int	= TABLE_ven0036[TABLE_ven0036].COL_PositivQuant
+		IF Var_posquant <> 0 THEN
+			TABLE_ven0036[TABLE_ven0036].COL_Pos		= Round((Var_pos /Var_posquant )*100,0) + "%" 	
+		END
+		TABLE_ven0036[TABLE_ven0036].COL_Posconcact	= TABLE_ven0036[TABLE_ven0036].COL_Positiv + "/" + TABLE_ven0036[TABLE_ven0036].COL_PositivQuant
+	ELSE
+		IF TABLE_ven0036[TABLE_ven0036].COL_PositivQuant = 0 THEN
+			TABLE_ven0036[TABLE_ven0036].COL_Pos		= 0+"%"
+			TABLE_ven0036[TABLE_ven0036].COL_Posconcact	= TABLE_ven0036[TABLE_ven0036].COL_Positiv + "/" + 0
+		END
+	END
+	IF TABLE_ven0036[TABLE_ven0036].COL_Pedidos = 0 THEN
+		TABLE_ven0036[TABLE_ven0036].COL_Pedidos = ""
+	END
+	
+	IF TABLE_ven0036[TABLE_ven0036].COL_Vendas = 0 THEN
+		TABLE_ven0036[TABLE_ven0036].COL_Vendas = ""
+	END
+	
+	IF TABLE_ven0036[TABLE_ven0036].COL_Devolucao = 0 THEN
+		TABLE_ven0036[TABLE_ven0036].COL_Devolucao = ""
+	END
+	
+	IF TABLE_ven0036[TABLE_ven0036].COL_Caixas = 0 THEN
+		TABLE_ven0036[TABLE_ven0036].COL_Caixas= ""
+	END
+	
+	IF TABLE_ven0036[TABLE_ven0036].COL_Peso = 0 THEN
+		TABLE_ven0036[TABLE_ven0036].COL_Peso = ""
+	END
+	
+	IF TABLE_ven0036[TABLE_ven0036].COL_Perda= 0 THEN
+		TABLE_ven0036[TABLE_ven0036].COL_Perda = ""
+	END
+	
+	IF TABLE_ven0036[TABLE_ven0036].COL_Perdaporcen= 0 THEN
+		TABLE_ven0036[TABLE_ven0036].COL_Perdaporcen = ""
+	END
+	
+	IF TABLE_ven0036[TABLE_ven0036].COL_Bonif= 0 THEN
+		TABLE_ven0036[TABLE_ven0036].COL_Bonif = ""
+	END
+END
+
+//----------------------------------------------------------------Totais das Colunas--------------------------------------------------//
+
+Var_stcpedidos		is numeric	= TABLE_ven0036.COL_Pedidos[rowTotal]			
+Var_stcdevol		is numeric	= TABLE_ven0036.COL_Devolucao[rowTotal]
+Var_stcPerda		is numeric	= TABLE_ven0036.COL_Perda[rowTotal]
+Var_stcBonificacao	is numeric	= TABLE_ven0036.COL_Bonif[rowTotal]
+Var_STCCaixas		is numeric	= TABLE_ven0036.COL_Caixas[rowTotal]
+Var_stcpeso			is numeric	= TABLE_ven0036.COL_Peso[rowTotal]
+Var_stcnovos		is numeric	= TABLE_ven0036.COL_Novos[rowTotal]
+Var_pos				is numeric	= TABLE_ven0036.COL_Positiv[rowTotal]
+Var_poscon			is numeric	= TABLE_ven0036.COL_PositivQuant[rowTotal]
+xVar_stcperdaporcen	is numeric	= TABLE_ven0036.COL_Perdaporcen[rowTotal]
+Var_postot			is string	= Var_pos + "/" + Var_poscon			//(Utilizado para calcular Positivação do vendedor verificando a qtd de clientes na Carteira)
+Var_stcvend			is numeric	= TABLE_ven0036.COL_Vendas[rowTotal]	//(Utilizado para calcular o total de vendas)
+Var_ValorBrutoTot	is numeric	= TABLE_ven0036.COL_ValorBruto[rowTotal]
+Var_vendtot			is numeric	= Var_stcdevol + Var_stcvend			//(Utilizado para calcular o RS/PEDIDO)
+Var_stcticketmed	is numeric	= TABLE_ven0036.COL_Ticketmed
+
+Var_posporc			is numeric
+var1				is string
+
+IF Var_stcvend <> 0 THEN
+	//Var_posporc = Round((Var_stcPerda/Var_stcvend)*100,2)//(Calcula a média total da perda dos vendedores(%))
+	IF Var_ValorBrutoTot <> 0 THEN
+		Var_posporc = Round((Var_stcPerda/Var_ValorBrutoTot)*100,2)//(Calcula a média total da perda dos vendedores(%)) ####### Feito com o ValorBruto #####
+	ELSE
+		Var_posporc = 0 
+	END
+	
+	IF Var_posporc = 0 THEN
+		var1	= Var_posporc
+		var1	= ""	
+	ELSE
+		var1 = Var_posporc
+	END
+END
+
+//----------------------------------------------Valida a Positivação do vendedor verificando a qtd de clientes na Carteira----------------------------//
+Var_val is string
+
+IF Var_poscon <> 0 THEN
+	Var_val = Round((Var_pos /Var_poscon )*100,0) + "%" 	
+ELSE
+	Var_val = ""	
+END	
+
+//---------------------------------------------------Calcula o ticket medio------------------------------------------------//
+
+IF Var_stcpedidos <> 0 THEN
+	Var_stcticketmed = Var_vendtot/Var_stcpedidos
+ELSE
+	Var_stcticketmed = ""
+END
+
+//--------------------------------------------------Modificações nas colunas da tabela Ven0036 -------------------------------------------------------------------//
+
+TableSort(TABLE_ven0036,"-COL_Vendas") //--Alinha a tabela pela Coluna Vendas
+TableMoveColumn(TABLE_ven0036,COL_Avaria,14) //
+
+//------------------------------------------Adiciona Totais na Tabela-------------------------------------------------------//
+
+Var_percent is string 
+FOR EACH ROW OF TABLE_ven0036
+	Var_pedven is numeric = TABLE_ven0036[TABLE_ven0036].COL_Vendas
+	IF Var_stcvend <> 0 THEN
+		Var_percent								= Round((Var_pedven/Var_stcvend)*100,0)	
+		TABLE_ven0036[TABLE_ven0036].COL_Porcentotal	= Var_percent
+	END	
+END
+
+//------------------------------Adição da linha de totais e aplicação do negrito nesta--------------------------//
+
+Val_linha= TableAddLine(TABLE_ven0036,TABLE_ven0036.COL_codigo[rowCount],"TOTAL GERAL",Var_stcpedidos,Var_stcvend,0,0,Var_stcticketmed,Var_STCCaixas,Var_stcpeso,Var_stcdevol,0,Var_stcPerda,var1,Var_stcBonificacao,0,0,Var_postot,Var_val,Var_stcnovos)  	
+
+TABLE_ven0036[Val_linha]..FontBold	= True	
+TableMoveLine(TABLE_ven0036,Val_linha,amLast,amMove)		
+
+//-----------------------------------------DROP nas tables temporárias------------------------------------------//
+
+ApagaTabelasTemp()
+
